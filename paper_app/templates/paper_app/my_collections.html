@@ -1,0 +1,50 @@
+{% extends "paper_app/base.html" %}
+
+{% block title %}我的收藏{% endblock %}
+
+{% block content %}
+<!-- 页面标题 -->
+<div class="mb-4">
+    <h2>
+        <i class="bi bi-heart-fill text-danger"></i> 我的收藏
+    </h2>
+    <p class="text-muted">共收藏 {{ papers|length }} 篇论文</p>
+</div>
+
+<!-- 收藏论文列表 -->
+{% if papers %}
+    <div class="row g-4">
+        {% for paper in papers %}
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-danger">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="card-title mb-0">{{ paper.title|truncatechars:30 }}</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            <strong>作者：</strong> {{ paper.authors|default:"未知作者"|truncatechars:50 }}
+                        </p>
+                        <p class="card-text text-muted small">
+                            <strong>摘要：</strong> {{ paper.abstract|truncatechars:100 }}
+                        </p>
+                    </div>
+                    <div class="card-footer bg-light d-flex justify-content-between">
+                        {% if paper.url %}
+                            <a href="{{ paper.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-link"></i> 查看原文
+                            </a>
+                        {% endif %}
+                        <span class="text-sm text-muted">收藏时间：{{ paper.crawl_time|slice:":10" }}</span>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="alert alert-warning text-center py-5">
+        <i class="bi bi-heartbreak fs-3"></i>
+        <h4 class="mt-2">暂无收藏的论文</h4>
+        <p class="mb-0">快去<a href="{% url 'paper_list' %}" class="text-primary">论文列表</a>收藏感兴趣的论文吧～</p>
+    </div>
+{% endif %}
+{% endblock %}

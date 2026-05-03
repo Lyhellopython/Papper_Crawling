@@ -1,0 +1,35 @@
+{% extends "paper_app/base.html" %}
+
+{% block title %}爬取日志{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h4>爬取日志（最后100行）</h4>
+        <button class="btn btn-secondary" onclick="location.reload()">
+            <i class="bi bi-arrow-clockwise"></i> 刷新日志
+        </button>
+    </div>
+    <div class="card-body">
+        <div class="bg-dark text-white p-3 rounded" style="height: 500px; overflow-y: auto; font-family: monospace; font-size: 14px;">
+            {% if logs %}
+                {% for line in logs %}
+                    <div class="mb-1">
+                        {% if 'ERROR' in line %}
+                            <span class="text-danger">{{ line|safe }}</span>
+                        {% elif 'WARNING' in line %}
+                            <span class="text-warning">{{ line|safe }}</span>
+                        {% elif 'INFO' in line %}
+                            <span class="text-info">{{ line|safe }}</span>
+                        {% else %}
+                            {{ line|safe }}
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="text-center text-muted mt-5">暂无日志记录</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

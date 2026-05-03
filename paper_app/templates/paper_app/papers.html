@@ -1,0 +1,202 @@
+{% extends "paper_app/base.html" %}
+
+{% block title %}论文列表 - 多来源汇总{% endblock %}
+
+{% block content %}
+<!-- 筛选表单：日期 + 关键词 + 来源 -->
+<div class="card mb-4 shadow-sm">
+    <div class="card-header bg-light">
+        <h5 class="mb-0">
+            <i class="bi bi-funnel me-2"></i>论文筛选
+        </h5>
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <!-- 日期筛选 -->
+            <div class="col-md-3">
+                <label for="date" class="form-label">发布日期</label>
+                <input type="date" class="form-control" id="date" name="date" value="{{ selected_date }}">
+            </div>
+
+            <!-- 关键词筛选 -->
+            <div class="col-md-4">
+                <label for="keyword" class="form-label">标题/摘要关键词</label>
+                <input type="text" class="form-control" id="keyword" name="keyword"
+                       placeholder="输入关键词（留空则无限制）" value="{{ input_keyword }}">
+            </div>
+
+            <!-- 来源筛选 -->
+            <div class="col-md-3">
+                <label for="source" class="form-label">论文来源</label>
+                <select class="form-select" id="source" name="source">
+                    <option value="" {% if not selected_source %}selected{% endif %}>所有来源</option>
+                    {% for s in all_sources %}
+                        <option value="{{ s }}" {% if selected_source == s %}selected{% endif %}>
+                            {{ s|upper }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- 筛选按钮 -->
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search"></i> 筛选
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 筛选结果统计 -->
+<div class="alert alert-info mb-4">
+    <i class="bi bi-info-circle"></i>
+    共筛选出 <strong>{{ papers|length }}</strong> 篇论文（
+    关键词：{% if input_keyword %}{{ input_keyword }}{% else %}无{% endif %}，
+    日期：{{ selected_date|default:"全部" }}，
+    来源：{% if selected_source %}{{ selected_source|upper }}{% else %}所有{% endif %}）
+</div>
+
+<!-- 论文列表 -->
+<div class="card shadow-sm">
+    <div class="card-header bg-dark text-white">
+        <h4 class="mb-0">
+            <i class="bi bi-journal-text me-2"></i>论文列表
+        </h4>
+    </div>
+    <div class="card-body">
+        {% if papers %}
+            <div class="list-group list-group-flush">
+                {% for paper in papers %}
+                    <div class="list-group-item mb-3 border rounded">
+                        <!-- 论文标题 + 来源标签 + 收藏按钮 + 查看原文 -->
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h5 class="mb-0">
+                                {{ paper.title|safe }}
+                                <!-- 来源标签 -->
+                                <span class="badge bg-{% if paper.source == 'arxiv' %}primary{% elif paper.source == 'ieee' %}success{% else %}secondary{% endif %} ms-2">
+                                    {{ paper.source|upper }}
+                                </span>
+                            </h5>
+                            <div class="btn-group">
+                                <!-- 收藏按钮 -->
+                                <button class="btn btn-sm {% if paper.is_collected %}btn-danger{% else %}btn-outline-danger{% endif %} collect-btn"
+                                        data-paper-id="{{ paper.doi|default:paper.title }}_{{ paper.source }}"
+                                        data-is-collected="{% if paper.is_collected %}true{% else %}false{% endif %}">
+                                    <i class="bi {% if paper.is_collected %}bi-heart-fill{% else %}bi-heart{% endif %}"></i>
+                                    {% if paper.is_collected %}已收藏{% else %}收藏{% endif %}
+                                </button>
+                                <!-- 查看原文按钮 -->
+                                {% if paper.url %}
+                                    <a href="{{ paper.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-link"></i> 原文
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- 论文作者 -->
+                        <p class="mb-2">
+                            <strong>作者：</strong> {{ paper.authors|default:"未知作者" }}
+                        </p>
+
+                        <!-- 论文摘要 -->
+                        <div class="mb-2">
+                            <strong>摘要：</strong>
+                            <p class="text-muted">{{ paper.abstract|safe|truncatechars:500 }}</p>
+                        </div>
+
+                        <!-- 额外信息 -->
+                        <div class="d-flex justify-content-between align-items-center text-sm text-muted">
+                            <div>
+                                {% if paper.doi %}
+                                    <span><strong>DOI：</strong> {{ paper.doi }}</span> |
+                                {% endif %}
+                                <span><strong>发布日期：</strong> {{ paper.publish_date }}</span>
+                            </div>
+                            <div>
+                                <span><strong>爬取时间：</strong> {{ paper.crawl_time }}</span>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="alert alert-warning text-center py-5">
+                <i class="bi bi-exclamation-triangle fs-3"></i>
+                <h4 class="mt-2">未找到符合条件的论文</h4>
+                <p class="mb-0">请尝试修改筛选条件，或先爬取更多论文</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 关键词高亮 + 收藏按钮交互逻辑 -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 1. 关键词高亮逻辑
+    const keyword = "{{ input_keyword }}".toLowerCase().trim();
+    if (keyword) {
+        const elements = document.querySelectorAll('.list-group-item h5, .list-group-item .text-muted');
+        elements.forEach(el => {
+            const originalHtml = el.innerHTML;
+            const regex = new RegExp(`(${keyword})`, 'gi');
+            el.innerHTML = originalHtml.replace(regex, '<span class="bg-warning">$1</span>');
+        });
+    }
+
+    // 2. 收藏按钮交互逻辑
+    const collectButtons = document.querySelectorAll('.collect-btn');
+    collectButtons.forEach(btn => {
+        btn.addEventListener('click', async function() {
+            const paperId = this.getAttribute('data-paper-id');
+            const isCollected = this.getAttribute('data-is-collected') === 'true';
+
+            try {
+                const response = await fetch("{% url 'collect_paper' %}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': getCsrfToken()
+                    },
+                    body: `paper_id=${encodeURIComponent(paperId)}&is_collected=${!isCollected}`
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    this.setAttribute('data-is-collected', !isCollected);
+                    if (!isCollected) {
+                        this.classList.remove('btn-outline-danger');
+                        this.classList.add('btn-danger');
+                        this.innerHTML = '<i class="bi bi-heart-fill"></i> 已收藏';
+                    } else {
+                        this.classList.remove('btn-danger');
+                        this.classList.add('btn-outline-danger');
+                        this.innerHTML = '<i class="bi bi-heart"></i> 收藏';
+                    }
+                    // Toast提示
+                    const toastLiveExample = document.createElement('div');
+                    toastLiveExample.className = 'toast position-fixed top-0 end-0 m-3';
+                    toastLiveExample.innerHTML = `
+                        <div class="toast-header">
+                            <i class="bi bi-check-circle text-success me-2"></i>
+                            <strong class="me-auto">操作成功</strong>
+                            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+                        </div>
+                        <div class="toast-body">${result.message}</div>
+                    `;
+                    document.body.appendChild(toastLiveExample);
+                    new bootstrap.Toast(toastLiveExample).show();
+                    setTimeout(() => toastLiveExample.remove(), 3000);
+                } else {
+                    alert('操作失败：' + result.message);
+                }
+            } catch (error) {
+                alert('操作失败：网络错误，请稍后重试');
+                console.error(error);
+            }
+        });
+    });
+});
+</script>
+{% endblock %}
